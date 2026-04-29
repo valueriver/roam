@@ -3,23 +3,26 @@ const { getStore } = require('../../db');
 function get() {
     const s = getStore();
     return {
-        apiUrl: s.getSetting('agent.apiUrl') || '',
-        apiKey: s.getSetting('agent.apiKey') || '',
-        model:  s.getSetting('agent.model')  || '',
+        provider: s.getSetting('agent.provider') || '',
+        apiUrl:   s.getSetting('agent.apiUrl')   || '',
+        apiKey:   s.getSetting('agent.apiKey')    || '',
+        model:    s.getSetting('agent.model')     || '',
     };
 }
 
 function set(data = {}) {
     const cur = get();
     const next = {
-        apiUrl: String(data.apiUrl || '').trim() || cur.apiUrl,
-        apiKey: String(data.apiKey || '').trim() || cur.apiKey,
-        model:  String(data.model  || '').trim() || cur.model,
+        provider: String(data.provider || '').trim() || cur.provider,
+        apiUrl:   String(data.apiUrl   || '').trim() || cur.apiUrl,
+        apiKey:   String(data.apiKey   || '').trim() || cur.apiKey,
+        model:    String(data.model    || '').trim() || cur.model,
     };
     const s = getStore();
-    s.setSetting('agent.apiUrl', next.apiUrl);
-    s.setSetting('agent.apiKey', next.apiKey);
-    s.setSetting('agent.model',  next.model);
+    s.setSetting('agent.provider', next.provider);
+    s.setSetting('agent.apiUrl',   next.apiUrl);
+    s.setSetting('agent.apiKey',   next.apiKey);
+    s.setSetting('agent.model',    next.model);
     return next;
 }
 

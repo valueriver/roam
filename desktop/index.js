@@ -4,6 +4,7 @@ const router = require('./core/router');
 const guard = require('./guard');
 const terminal = require('./terminal');
 const agent = require('./agent');
+const claudeCode = require('./claude-code');
 
 async function boot() {
     // 预先初始化（没 db 的话会在这里创建文件）
@@ -15,6 +16,8 @@ async function boot() {
         agent.sendConfig(`web:${clientId}`);
         agent.sendSessions(`web:${clientId}`);
         agent.sendHistory(`web:${clientId}`);
+        claudeCode.sendStatus(`web:${clientId}`);
+        claudeCode.sendSessions(`web:${clientId}`);
     });
 
     // 有 web 端在线（先到或 reconnect 上来）时推一次全体快照
@@ -26,6 +29,8 @@ async function boot() {
             agent.sendSessions('web');
             agent.sendHistory('web');
             guard.sendAuthMode();
+            claudeCode.sendStatus('web');
+            claudeCode.sendSessions('web');
         }
     });
 

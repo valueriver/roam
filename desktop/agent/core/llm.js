@@ -1,8 +1,24 @@
-function buildHeaders(apiKey, apiUrl) {
-    const headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-    };
+const { openaiParser } = require('./parsers/openai');
+const { deepseekParser } = require('./parsers/deepseek');
+const { kimiParser } = require('./parsers/kimi');
+const { geminiParser } = require('./parsers/gemini');
+
+function pickParser(provider, apiUrl) {
+    const url = String(apiUrl || '');
+    if (provider === 'deepseek' || url.includes('api.deepseek.com')) return deepseekParser;
+    if (provider === 'kimi' || url.includes('moonshot.cn') || url.includes('kimi.com')) return kimiParser;
+    if (provider === 'gemini' || url.includes('/gemini/')) return geminiParser;
+    return openaiParser;
+}
+
+function buildHeaders(provider, apiUrl, apiKey) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (provider === 'claude') {
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+    } else {
+        headers.Authorization = `Bearer ${apiKey}`;
+    }
     if (String(apiUrl || '').includes('openrouter.ai')) {
         headers['HTTP-Referer'] = 'https://meem.local';
         headers['X-Title'] = 'meem';
@@ -18,48 +34,15 @@ function normalizeUsage(usage) {
     return { promptTokens, completionTokens, totalTokens };
 }
 
-function ensureToolCall(toolCalls, index) {
-    if (!toolCalls[index]) {
-        toolCalls[index] = {
-            id: '',
-            type: 'function',
-            function: { name: '', arguments: '' },
-        };
-    }
-    return toolCalls[index];
-}
+async function callLlmStream(provider, apiUrl, apiKey, payload, { signal, onDelta } = {}) {
+    const parser = pickParser(provider, apiUrl);
+    const state = parser.createState();
+    let usage = null;
 
-function parseOpenAiDelta(json, state, onDelta) {
-    if (json?.usage) state.usage = normalizeUsage(json.usage);
-    const choice = json?.choices?.[0];
-    if (!choice) return;
-    const delta = choice.delta || {};
-    const text = typeof delta.content === 'string' ? delta.content : '';
-    if (text) {
-        state.content += text;
-        onDelta?.(text);
-    }
-    if (Array.isArray(delta.tool_calls)) {
-        for (const tc of delta.tool_calls) {
-            const idx = Number(tc?.index || 0);
-            const target = ensureToolCall(state.toolCalls, idx);
-            if (tc?.id) target.id = tc.id;
-            if (tc?.type) target.type = tc.type;
-            if (tc?.function?.name) target.function.name += tc.function.name;
-            if (tc?.function?.arguments) target.function.arguments += tc.function.arguments;
-        }
-    }
-}
-
-async function callLlmStream(apiUrl, apiKey, payload, { signal, onDelta } = {}) {
     const res = await fetch(apiUrl, {
         method: 'POST',
-        headers: buildHeaders(apiKey, apiUrl),
-        body: JSON.stringify({
-            ...payload,
-            stream: true,
-            stream_options: { include_usage: true },
-        }),
+        headers: buildHeaders(provider, apiUrl, apiKey),
+        body: JSON.stringify({ ...payload, stream: true }),
         signal,
     });
     if (!res.ok) {
@@ -71,7 +54,6 @@ async function callLlmStream(apiUrl, apiKey, payload, { signal, onDelta } = {}) 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
-    const state = { content: '', toolCalls: [], usage: null };
 
     while (true) {
         const { done, value } = await reader.read();
@@ -85,31 +67,23 @@ async function callLlmStream(apiUrl, apiKey, payload, { signal, onDelta } = {}) 
 
             const raw = event
                 .split('\n')
-                .map((line) => line.trim())
+                .map((l) => l.trim())
                 .filter(Boolean)
-                .filter((line) => line.startsWith('data:'))
-                .map((line) => line.slice(5).trim())
+                .filter((l) => l.startsWith('data:'))
+                .map((l) => l.slice(5).trim())
                 .join('\n');
 
             if (!raw || raw === '[DONE]') continue;
-            parseOpenAiDelta(JSON.parse(raw), state, onDelta);
+            let json;
+            try { json = JSON.parse(raw); } catch { continue; }
+            if (json?.usage) usage = normalizeUsage(json.usage);
+            parser.parseChunk(json, state, onDelta);
         }
     }
 
-    if (state.toolCalls.length) {
-        return {
-            role: 'assistant',
-            content: state.content || null,
-            tool_calls: state.toolCalls.filter(Boolean),
-            usage: state.usage,
-        };
-    }
-
-    return {
-        role: 'assistant',
-        content: state.content ?? '',
-        usage: state.usage,
-    };
+    const message = parser.toMessage(state);
+    message.usage = usage;
+    return message;
 }
 
 module.exports = { callLlmStream };

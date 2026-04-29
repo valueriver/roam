@@ -4,6 +4,7 @@ const terminal = require('../terminal');
 const files = require('../files');
 const agent = require('../agent');
 const screen = require('../screen');
+const claudeCode = require('../claude-code');
 
 // onDevicesChanged 由 index.js 注入（web 上线时推各 feature 的初始快照）
 let onDevicesChanged = () => {};
@@ -41,6 +42,9 @@ async function dispatch(message) {
     }
     if (t.startsWith('agent.')) {
         if (await agent.handle(message)) return;
+    }
+    if (t.startsWith('cc.')) {
+        if (await claudeCode.handle(message)) return;
     }
 
     console.log('未知消息类型:', t);

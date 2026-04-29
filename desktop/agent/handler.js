@@ -6,7 +6,7 @@ const { tools } = require('./tools');
 const { systemPrompt } = require('./prompt');
 const runner = require('./runner');
 
-const runs = new Map();  // clientId -> { abortController }
+const runs = new Map();
 
 function abort(clientId) {
     const active = runs.get(clientId);
@@ -56,7 +56,7 @@ async function chat(clientId, input) {
 
     try {
         for (let round = 0; round < 24; round++) {
-            const message = await callLlmStream(cfg.apiUrl, cfg.apiKey, {
+            const message = await callLlmStream(cfg.provider, cfg.apiUrl, cfg.apiKey, {
                 model: cfg.model,
                 messages,
                 tools,
@@ -71,6 +71,9 @@ async function chat(clientId, input) {
                     content: message.content ?? null,
                     tool_calls: message.tool_calls,
                 };
+                if (message.reasoning_content !== undefined) {
+                    assistantMsg.reasoning_content = message.reasoning_content;
+                }
                 messages.push(assistantMsg);
                 session.appendMessage(assistantMsg);
 

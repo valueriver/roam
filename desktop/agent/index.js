@@ -15,6 +15,7 @@ function sendConfig(target = 'web') {
     const cfg = config.get();
     const data = {
         configured: Boolean(cfg.apiUrl && cfg.apiKey && cfg.model),
+        provider: cfg.provider || '',
         model: cfg.model || '',
         apiUrl: cfg.apiUrl || '',
         apiKeyMasked: cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}...${cfg.apiKey.slice(-4)}` : '',

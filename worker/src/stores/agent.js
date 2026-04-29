@@ -60,6 +60,7 @@ export const useAgentStore = defineStore('agent', () => {
     const input = ref('');
     const running = ref(false);
     const configured = ref(false);
+    const provider = ref('');
     const model = ref('');
     const apiUrl = ref('');
     const apiKeyMasked = ref('');
@@ -99,6 +100,7 @@ export const useAgentStore = defineStore('agent', () => {
 
         ws.onMessage('agent.config', (msg) => {
             configured.value = Boolean(msg.data?.configured);
+            provider.value = msg.data?.provider || '';
             model.value = msg.data?.model || '';
             apiUrl.value = msg.data?.apiUrl || '';
             apiKeyMasked.value = msg.data?.apiKeyMasked || '';
@@ -234,6 +236,7 @@ export const useAgentStore = defineStore('agent', () => {
             type: 'agent.set_config',
             to: 'desktop',
             data: {
+                provider: payload.provider || '',
                 apiUrl: payload.apiUrl || '',
                 apiKey: payload.apiKey || '',
                 model: payload.model || '',
@@ -243,7 +246,7 @@ export const useAgentStore = defineStore('agent', () => {
 
     return {
         messages, input, running,
-        configured, model, apiUrl, apiKeyMasked,
+        configured, provider, model, apiUrl, apiKeyMasked,
         sessionId, sessionTitle, sessions,
         hasMore, loadedOffset,
         initialize, send, abort, saveConfig,
